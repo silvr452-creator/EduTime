@@ -20,15 +20,15 @@ import {
   AlertDialogTitle,
 } from '@/app/components/ui/alert-dialog';
 import { Badge } from '@/app/components/ui/badge';
-import { ScheduleItem } from '@/app/components/schedule-card';
+import { ScheduleItem } from '@/app/types/schedule';
 import { AddEditLessonDialog } from '@/app/components/admin/add-edit-lesson-dialog';
 
 interface ScheduleTableProps {
   scheduleData: Record<string, ScheduleItem[]>;
   searchQuery: string;
   filterType: 'group' | 'teacher';
-  onEdit: (lesson: ScheduleItem) => void;
-  onDelete: (lessonId: string) => void;
+  onEdit: (lesson: ScheduleItem) => Promise<void>;
+  onDelete: (lessonId: string) => Promise<void>;
 }
 
 const DAY_NAMES: Record<string, string> = {
@@ -86,21 +86,21 @@ export function ScheduleTable({
     setDeleteConfirmOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (lessonToDelete) {
-      onDelete(lessonToDelete);
+      await onDelete(lessonToDelete);
       setLessonToDelete(null);
     }
     setDeleteConfirmOpen(false);
   };
 
   const handleEditClick = (lesson: ScheduleItem & { day: string }) => {
-    setEditingLesson(lesson);
+    setEditingLesson({ ...lesson, day: lesson.day });
     setIsEditDialogOpen(true);
   };
 
-  const handleEditSave = (lesson: ScheduleItem) => {
-    onEdit(lesson);
+  const handleEditSave = async (lesson: ScheduleItem) => {
+    await onEdit(lesson);
     setIsEditDialogOpen(false);
     setEditingLesson(null);
   };
