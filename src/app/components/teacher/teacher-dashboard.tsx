@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { WeekNavigation } from '@/app/components/week-navigation';
-import { ScheduleCard, ScheduleItem } from '@/app/components/schedule-card';
+import { ScheduleCard } from '@/app/components/schedule-card';
+import { ScheduleItem } from '@/app/types/schedule';
 import { BookOpen, LogOut, User } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -24,12 +25,14 @@ interface TeacherDashboardProps {
   userName: string;
   onLogout: () => void;
   scheduleData: Record<string, ScheduleItem[]>;
+  isLoading?: boolean;
 }
 
 export function TeacherDashboard({
   userName,
   onLogout,
   scheduleData,
+  isLoading = false,
 }: TeacherDashboardProps) {
   const [selectedDay, setSelectedDay] = useState('monday');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
@@ -142,7 +145,9 @@ export function TeacherDashboard({
 
           {/* Расписание */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6 shadow-sm">
-            {filteredSchedule.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12 text-gray-600">Загрузка расписания...</div>
+            ) : filteredSchedule.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredSchedule.map((item) => (
                   <ScheduleCard key={item.id} item={item} />

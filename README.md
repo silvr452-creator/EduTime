@@ -109,6 +109,19 @@
                             Выход → Экран входа
 ```
 
+
+## 📚 Быстрый старт для новичка
+
+- Подробный обзор структуры и важных мест в проекте: [`docs/NEWCOMER_GUIDE.md`](docs/NEWCOMER_GUIDE.md)
+
+
+## 🗄️ Данные из реальной БД
+
+Приложение использует backend API для чтения/изменения расписания. Контракт подготовлен под MySQL и ER-диаграмму (таблицы role/user/student/teacher/groups/subject/classroom/lesson).
+
+- Настройка и контракт API: [`docs/DB_SETUP.md`](docs/DB_SETUP.md)
+- Обязательная переменная окружения: `VITE_API_BASE_URL`
+
 ## ⚡ Технологии
 
 - React 18

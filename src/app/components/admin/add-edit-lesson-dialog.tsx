@@ -17,16 +17,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
-import { ScheduleItem } from '@/app/components/schedule-card';
+import {
+  LessonType,
+  LessonUpsertPayload,
+  ScheduleItem,
+  ScheduleReferenceData,
+  WeekDay,
+} from '@/app/types/schedule';
 
 interface AddEditLessonDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (lesson: ScheduleItem) => void;
+  onSave: ((lesson: LessonUpsertPayload) => void | Promise<void>) |
+    ((lessonId: string, lesson: LessonUpsertPayload) => void | Promise<void>);
   initialData?: ScheduleItem;
+  referenceData: ScheduleReferenceData;
 }
 
-const DAYS = [
+const DAYS: Array<{ value: WeekDay; label: string }> = [
   { value: 'monday', label: 'Понедельник' },
   { value: 'tuesday', label: 'Вторник' },
   { value: 'wednesday', label: 'Среда' },
@@ -35,53 +43,33 @@ const DAYS = [
   { value: 'saturday', label: 'Суббота' },
 ];
 
-const GROUPS = ['ИС-21', 'ИС-22', 'ПИ-21', 'ПИ-22', 'КС-21', 'КС-22'];
-
-const TEACHERS = [
-  'Иванова А.П.',
-  'Петров В.С.',
-  'Смирнова О.Л.',
-  'Сидоров М.Н.',
-  'Волкова Е.А.',
-  'Морозов И.К.',
-  'Новиков П.Р.',
-  'Козлов Д.И.',
-];
-
-const ROOMS = [
-  'Ауд. 205',
-  'Ауд. 210',
-  'Ауд. 215',
-  'Ауд. 301',
-  'Ауд. 305',
-  'Ауд. 308',
-  'Ауд. 315',
-  'Ауд. 320',
-  'Ауд. 405',
-  'Ауд. 412',
-  'Спортзал',
-];
-
-const LESSON_TYPES: Array<{ value: 'lecture' | 'practice' | 'lab'; label: string }> = [
+const LESSON_TYPES: Array<{ value: LessonType; label: string }> = [
   { value: 'lecture', label: 'Лекция' },
   { value: 'practice', label: 'Практика' },
   { value: 'lab', label: 'Лабораторная работа' },
 ];
+
+const parseTimeRange = (timeRange: string) => {
+  const [startTime = '', endTime = ''] = timeRange.split('-').map((part) => part.trim());
+  return { startTime, endTime };
+};
 
 export function AddEditLessonDialog({
   open,
   onOpenChange,
   onSave,
   initialData,
+  referenceData,
 }: AddEditLessonDialogProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LessonUpsertPayload>({
     day: 'monday',
-    subject: '',
-    time: '',
-    group: '',
-    teacher: '',
-    room: '',
-    type: 'lecture' as 'lecture' | 'practice' | 'lab',
+    startTime: '',
+    endTime: '',
+    subjectId: 0,
+    teacherId: 0,
+    groupId: 0,
+    classroomId: 0,
+    type: 'lecture',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -89,102 +77,107 @@ export function AddEditLessonDialog({
   useEffect(() => {
     if (initialData) {
       setFormData({
-        day: 'monday', // В реальном приложении нужно получать день из данных
-        subject: initialData.subject,
-        time: initialData.time,
-        group: initialData.group,
-        teacher: initialData.teacher,
-        room: initialData.room,
+        day: initialData.day,
+        startTime: initialData.startTime,
+        endTime: initialData.endTime,
+        subjectId: initialData.subjectId,
+        teacherId: initialData.teacherId,
+        groupId: initialData.groupId,
+        classroomId: initialData.classroomId,
         type: initialData.type,
       });
-    } else {
-      setFormData({
-        day: 'monday',
-        subject: '',
-        time: '',
-        group: '',
-        teacher: '',
-        room: '',
-        type: 'lecture',
-      });
+      setErrors({});
+      return;
     }
+
+    const defaultSubject = referenceData.subjects[0]?.id ?? 0;
+    const defaultTeacher = referenceData.teachers[0]?.id ?? 0;
+    const defaultGroup = referenceData.groups[0]?.id ?? 0;
+    const defaultClassroom = referenceData.classrooms[0]?.id ?? 0;
+
+    setFormData({
+      day: 'monday',
+      startTime: '',
+      endTime: '',
+      subjectId: defaultSubject,
+      teacherId: defaultTeacher,
+      groupId: defaultGroup,
+      classroomId: defaultClassroom,
+      type: 'lecture',
+    });
     setErrors({});
-  }, [initialData, open]);
+  }, [initialData, open, referenceData]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.subject.trim()) {
-      newErrors.subject = 'Введите название предмета';
-    }
-
-    if (!formData.time.trim()) {
-      newErrors.time = 'Введите время занятия';
-    }
-
-    if (!formData.group) {
-      newErrors.group = 'Выберите группу';
-    }
-
-    if (!formData.teacher) {
-      newErrors.teacher = 'Выберите преподавателя';
-    }
-
-    if (!formData.room) {
-      newErrors.room = 'Выберите аудиторию';
-    }
+    if (!formData.startTime.trim()) newErrors.startTime = 'Введите время начала';
+    if (!formData.endTime.trim()) newErrors.endTime = 'Введите время окончания';
+    if (!formData.subjectId) newErrors.subjectId = 'Выберите предмет';
+    if (!formData.teacherId) newErrors.teacherId = 'Выберите преподавателя';
+    if (!formData.groupId) newErrors.groupId = 'Выберите группу';
+    if (!formData.classroomId) newErrors.classroomId = 'Выберите аудиторию';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (validateForm()) {
-      const lesson: ScheduleItem = {
-        id: initialData?.id || `lesson-${Date.now()}`,
-        subject: formData.subject,
-        time: formData.time,
-        group: formData.group,
-        teacher: formData.teacher,
-        room: formData.room,
-        type: formData.type,
-      };
+    if (!validateForm()) return;
 
-      onSave(lesson);
-      onOpenChange(false);
+    if (initialData) {
+      await (onSave as (lessonId: string, lesson: LessonUpsertPayload) => Promise<void>)(
+        initialData.id,
+        formData
+      );
+    } else {
+      await (onSave as (lesson: LessonUpsertPayload) => Promise<void>)(formData);
+    }
+
+    onOpenChange(false);
+  };
+
+  const handleTimeRangeChange = (value: string) => {
+    const parsed = parseTimeRange(value);
+    setFormData((prev) => ({ ...prev, ...parsed }));
+    if (errors.startTime || errors.endTime) {
+      setErrors((prev) => ({ ...prev, startTime: '', endTime: '' }));
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
+  const handleSelectNumber = (field: keyof LessonUpsertPayload, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: Number(value) }));
     if (errors[field]) {
-      setErrors({ ...errors, [field]: '' });
+      setErrors((prev) => ({ ...prev, [field]: '' }));
     }
   };
+
+  const handleTypeChange = (value: string) => {
+    setFormData((prev) => ({ ...prev, type: value as LessonType }));
+  };
+
+  const timeRange =
+    formData.startTime && formData.endTime
+      ? `${formData.startTime} - ${formData.endTime}`
+      : '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {initialData ? 'Редактировать занятие' : 'Добавить занятие'}
-          </DialogTitle>
+          <DialogTitle>{initialData ? 'Редактировать занятие' : 'Добавить занятие'}</DialogTitle>
           <DialogDescription>
-            Заполните информацию о занятии. Все поля обязательны для заполнения.
+            Форма использует реальные справочники БД (предметы, группы, преподаватели, аудитории).
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* День недели */}
             <div className="space-y-2">
               <Label htmlFor="day">День недели</Label>
-              <Select
-                value={formData.day}
-                onValueChange={(value) => handleInputChange('day', value)}
-              >
+              <Select value={formData.day} onValueChange={(value) => setFormData((prev) => ({ ...prev, day: value as WeekDay }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -198,45 +191,43 @@ export function AddEditLessonDialog({
               </Select>
             </div>
 
-            {/* Время */}
             <div className="space-y-2">
-              <Label htmlFor="time">Время</Label>
+              <Label htmlFor="timeRange">Время (формат: 08:30 - 10:00)</Label>
               <Input
-                id="time"
+                id="timeRange"
                 placeholder="08:30 - 10:00"
-                value={formData.time}
-                onChange={(e) => handleInputChange('time', e.target.value)}
-                className={errors.time ? 'border-red-500' : ''}
+                value={timeRange}
+                onChange={(e) => handleTimeRangeChange(e.target.value)}
+                className={errors.startTime || errors.endTime ? 'border-red-500' : ''}
               />
-              {errors.time && (
-                <p className="text-sm text-red-600">{errors.time}</p>
+              {(errors.startTime || errors.endTime) && (
+                <p className="text-sm text-red-600">{errors.startTime || errors.endTime}</p>
               )}
             </div>
 
-            {/* Предмет */}
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <Label htmlFor="subject">Предмет</Label>
-              <Input
-                id="subject"
-                placeholder="Например: Математический анализ"
-                value={formData.subject}
-                onChange={(e) => handleInputChange('subject', e.target.value)}
-                className={errors.subject ? 'border-red-500' : ''}
-              />
-              {errors.subject && (
-                <p className="text-sm text-red-600">{errors.subject}</p>
-              )}
+              <Select
+                value={formData.subjectId ? String(formData.subjectId) : ''}
+                onValueChange={(value) => handleSelectNumber('subjectId', value)}
+              >
+                <SelectTrigger className={errors.subjectId ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Выберите предмет" />
+                </SelectTrigger>
+                <SelectContent>
+                  {referenceData.subjects.map((subject) => (
+                    <SelectItem key={subject.id} value={String(subject.id)}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.subjectId && <p className="text-sm text-red-600">{errors.subjectId}</p>}
             </div>
 
-            {/* Тип занятия */}
             <div className="space-y-2">
               <Label htmlFor="type">Тип занятия</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value) =>
-                  handleInputChange('type', value as 'lecture' | 'practice' | 'lab')
-                }
-              >
+              <Select value={formData.type} onValueChange={handleTypeChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -250,82 +241,69 @@ export function AddEditLessonDialog({
               </Select>
             </div>
 
-            {/* Группа */}
             <div className="space-y-2">
               <Label htmlFor="group">Группа</Label>
               <Select
-                value={formData.group}
-                onValueChange={(value) => handleInputChange('group', value)}
+                value={formData.groupId ? String(formData.groupId) : ''}
+                onValueChange={(value) => handleSelectNumber('groupId', value)}
               >
-                <SelectTrigger className={errors.group ? 'border-red-500' : ''}>
+                <SelectTrigger className={errors.groupId ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Выберите группу" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GROUPS.map((group) => (
-                    <SelectItem key={group} value={group}>
-                      {group}
+                  {referenceData.groups.map((group) => (
+                    <SelectItem key={group.id} value={String(group.id)}>
+                      {group.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.group && (
-                <p className="text-sm text-red-600">{errors.group}</p>
-              )}
+              {errors.groupId && <p className="text-sm text-red-600">{errors.groupId}</p>}
             </div>
 
-            {/* Преподаватель */}
             <div className="space-y-2">
               <Label htmlFor="teacher">Преподаватель</Label>
               <Select
-                value={formData.teacher}
-                onValueChange={(value) => handleInputChange('teacher', value)}
+                value={formData.teacherId ? String(formData.teacherId) : ''}
+                onValueChange={(value) => handleSelectNumber('teacherId', value)}
               >
-                <SelectTrigger className={errors.teacher ? 'border-red-500' : ''}>
+                <SelectTrigger className={errors.teacherId ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Выберите преподавателя" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TEACHERS.map((teacher) => (
-                    <SelectItem key={teacher} value={teacher}>
-                      {teacher}
+                  {referenceData.teachers.map((teacher) => (
+                    <SelectItem key={teacher.id} value={String(teacher.id)}>
+                      {teacher.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.teacher && (
-                <p className="text-sm text-red-600">{errors.teacher}</p>
-              )}
+              {errors.teacherId && <p className="text-sm text-red-600">{errors.teacherId}</p>}
             </div>
 
-            {/* Аудитория */}
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="room">Аудитория</Label>
               <Select
-                value={formData.room}
-                onValueChange={(value) => handleInputChange('room', value)}
+                value={formData.classroomId ? String(formData.classroomId) : ''}
+                onValueChange={(value) => handleSelectNumber('classroomId', value)}
               >
-                <SelectTrigger className={errors.room ? 'border-red-500' : ''}>
+                <SelectTrigger className={errors.classroomId ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Выберите аудиторию" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROOMS.map((room) => (
-                    <SelectItem key={room} value={room}>
-                      {room}
+                  {referenceData.classrooms.map((room) => (
+                    <SelectItem key={room.id} value={String(room.id)}>
+                      {room.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.room && (
-                <p className="text-sm text-red-600">{errors.room}</p>
-              )}
+              {errors.classroomId && <p className="text-sm text-red-600">{errors.classroomId}</p>}
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Отмена
             </Button>
             <Button type="submit" className="bg-purple-600 hover:bg-purple-700">

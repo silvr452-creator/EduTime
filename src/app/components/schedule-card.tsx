@@ -1,15 +1,6 @@
 import { Clock, MapPin, User } from 'lucide-react';
 import { Card } from '@/app/components/ui/card';
-
-export interface ScheduleItem {
-  id: string;
-  subject: string;
-  time: string;
-  room: string;
-  teacher: string;
-  group: string;
-  type: 'lecture' | 'practice' | 'lab';
-}
+import { ScheduleItem } from '@/app/types/schedule';
 
 interface ScheduleCardProps {
   item: ScheduleItem;

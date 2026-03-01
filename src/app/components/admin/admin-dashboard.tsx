@@ -10,73 +10,71 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import { ScheduleTable } from '@/app/components/admin/schedule-table';
 import { AddEditLessonDialog } from '@/app/components/admin/add-edit-lesson-dialog';
-import { ScheduleItem } from '@/app/components/schedule-card';
+import {
+  LessonUpsertPayload,
+  ScheduleItem,
+  ScheduleReferenceData,
+} from '@/app/types/schedule';
+import { toast } from 'sonner';
 
 interface AdminDashboardProps {
   userName: string;
   onLogout: () => void;
   scheduleData: Record<string, ScheduleItem[]>;
-  onUpdateSchedule: (schedule: Record<string, ScheduleItem[]>) => void;
+  referenceData: ScheduleReferenceData;
+  isLoading?: boolean;
+  onAddLesson: (lesson: LessonUpsertPayload) => Promise<void>;
+  onEditLesson: (lessonId: string, lesson: LessonUpsertPayload) => Promise<void>;
+  onDeleteLesson: (lessonId: string) => Promise<void>;
 }
 
 export function AdminDashboard({
   userName,
   onLogout,
   scheduleData,
-  onUpdateSchedule,
+  referenceData,
+  isLoading = false,
+  onAddLesson,
+  onEditLesson,
+  onDeleteLesson,
 }: AdminDashboardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'group' | 'teacher'>('group');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
-  const handleAddLesson = (lesson: ScheduleItem) => {
-    const day = getDayFromDate(new Date()); // Можно улучшить логику
-    const updatedSchedule = { ...scheduleData };
-    
-    if (!updatedSchedule[day]) {
-      updatedSchedule[day] = [];
+  const handleAddLesson = async (lesson: LessonUpsertPayload) => {
+    try {
+      await onAddLesson(lesson);
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось добавить занятие';
+      toast.error(message);
     }
-    
-    updatedSchedule[day] = [...updatedSchedule[day], lesson];
-    onUpdateSchedule(updatedSchedule);
-    setIsAddDialogOpen(false);
   };
 
-  const handleEditLesson = (lesson: ScheduleItem) => {
-    const updatedSchedule = { ...scheduleData };
-    
-    Object.keys(updatedSchedule).forEach((day) => {
-      updatedSchedule[day] = updatedSchedule[day].map((item) =>
-        item.id === lesson.id ? lesson : item
-      );
-    });
-    
-    onUpdateSchedule(updatedSchedule);
+  const handleEditLesson = async (lessonId: string, lesson: LessonUpsertPayload) => {
+    try {
+      await onEditLesson(lessonId, lesson);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось обновить занятие';
+      toast.error(message);
+    }
   };
 
-  const handleDeleteLesson = (lessonId: string) => {
-    const updatedSchedule = { ...scheduleData };
-    
-    Object.keys(updatedSchedule).forEach((day) => {
-      updatedSchedule[day] = updatedSchedule[day].filter(
-        (item) => item.id !== lessonId
-      );
-    });
-    
-    onUpdateSchedule(updatedSchedule);
-  };
-
-  const getDayFromDate = (date: Date): string => {
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    return days[date.getDay()];
+  const handleDeleteLesson = async (lessonId: string) => {
+    try {
+      await onDeleteLesson(lessonId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось удалить занятие';
+      toast.error(message);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Шапка */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
           <div className="flex items-center justify-between">
@@ -85,16 +83,11 @@ export function AdminDashboard({
                 <BookOpen className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-                  Панель администратора
-                </h1>
-                <p className="text-sm text-gray-600 mt-0.5">
-                  Управление расписанием
-                </p>
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Панель администратора</h1>
+                <p className="text-sm text-gray-600 mt-0.5">Управление расписанием</p>
               </div>
             </div>
 
-            {/* Меню пользователя */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
@@ -108,9 +101,7 @@ export function AdminDashboard({
                 <DropdownMenuLabel>
                   <div>
                     <p className="font-medium">{userName}</p>
-                    <p className="text-sm text-gray-500 font-normal">
-                      Администратор
-                    </p>
+                    <p className="text-sm text-gray-500 font-normal">Администратор</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -124,14 +115,11 @@ export function AdminDashboard({
         </div>
       </header>
 
-      {/* Основной контент */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <div className="space-y-6">
-          {/* Панель действий */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex-1 flex flex-col sm:flex-row gap-3">
-                {/* Поиск */}
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
@@ -143,7 +131,6 @@ export function AdminDashboard({
                   />
                 </div>
 
-                {/* Фильтр */}
                 <Tabs
                   value={selectedFilter}
                   onValueChange={(value) => setSelectedFilter(value as 'group' | 'teacher')}
@@ -156,10 +143,10 @@ export function AdminDashboard({
                 </Tabs>
               </div>
 
-              {/* Кнопка добавления */}
               <Button
                 onClick={() => setIsAddDialogOpen(true)}
                 className="bg-purple-600 hover:bg-purple-700 gap-2"
+                disabled={isLoading || referenceData.groups.length === 0}
               >
                 <Plus className="w-4 h-4" />
                 Добавить занятие
@@ -167,22 +154,22 @@ export function AdminDashboard({
             </div>
           </div>
 
-          {/* Таблица расписания */}
           <ScheduleTable
             scheduleData={scheduleData}
             searchQuery={searchQuery}
             filterType={selectedFilter}
             onEdit={handleEditLesson}
             onDelete={handleDeleteLesson}
+            referenceData={referenceData}
           />
         </div>
       </main>
 
-      {/* Диалог добавления занятия */}
       <AddEditLessonDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onSave={handleAddLesson}
+        referenceData={referenceData}
       />
     </div>
   );
