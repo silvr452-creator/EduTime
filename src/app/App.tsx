@@ -5,11 +5,16 @@ import { DashboardScreen } from '@/app/components/dashboard/dashboard-screen';
 import { AdminDashboard } from '@/app/components/admin/admin-dashboard';
 import { TeacherDashboard } from '@/app/components/teacher/teacher-dashboard';
 import { toast, Toaster } from 'sonner';
-import { ScheduleItem } from '@/app/types/schedule';
+import {
+  LessonUpsertPayload,
+  ScheduleItem,
+  ScheduleReferenceData,
+} from '@/app/types/schedule';
 import { createEmptySchedule, toScheduleMap } from '@/app/lib/schedule-utils';
 import {
   createLesson,
   fetchLessons,
+  fetchReferenceData,
   removeLesson,
   updateLesson,
 } from '@/app/services/schedule-service';
@@ -23,22 +28,38 @@ interface User {
   role: UserRole;
 }
 
+const emptyReferenceData: ScheduleReferenceData = {
+  subjects: [],
+  teachers: [],
+  groups: [],
+  classrooms: [],
+};
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [user, setUser] = useState<User | null>(null);
   const [scheduleData, setScheduleData] = useState<Record<string, ScheduleItem[]>>(
     createEmptySchedule()
   );
+  const [referenceData, setReferenceData] = useState<ScheduleReferenceData>(
+    emptyReferenceData
+  );
   const [scheduleLoading, setScheduleLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const lessons = await fetchLessons();
+        const [lessons, refs] = await Promise.all([
+          fetchLessons(),
+          fetchReferenceData(),
+        ]);
+
         setScheduleData(toScheduleMap(lessons));
+        setReferenceData(refs);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Не удалось загрузить расписание';
-        toast.error(`Ошибка загрузки расписания: ${message}`);
+        const message =
+          error instanceof Error ? error.message : 'Не удалось загрузить данные';
+        toast.error(`Ошибка загрузки: ${message}`);
       } finally {
         setScheduleLoading(false);
       }
@@ -99,7 +120,7 @@ export default function App() {
     toast.success('Вы успешно вышли из системы');
   };
 
-  const handleAddLesson = async (lesson: Omit<ScheduleItem, 'id'>) => {
+  const handleAddLesson = async (lesson: LessonUpsertPayload) => {
     const created = await createLesson(lesson);
     setScheduleData((prev) => ({
       ...prev,
@@ -108,8 +129,11 @@ export default function App() {
     toast.success('Занятие добавлено');
   };
 
-  const handleEditLesson = async (lesson: ScheduleItem) => {
-    const updated = await updateLesson(lesson);
+  const handleEditLesson = async (
+    lessonId: string,
+    lesson: LessonUpsertPayload
+  ) => {
+    const updated = await updateLesson(lessonId, lesson);
     setScheduleData((prev) => {
       const next: Record<string, ScheduleItem[]> = {};
       Object.keys(prev).forEach((day) => {
@@ -156,6 +180,8 @@ export default function App() {
               userName={user.name}
               onLogout={handleLogout}
               scheduleData={scheduleData}
+              referenceData={referenceData}
+              isLoading={scheduleLoading}
               onAddLesson={handleAddLesson}
               onEditLesson={handleEditLesson}
               onDeleteLesson={handleDeleteLesson}

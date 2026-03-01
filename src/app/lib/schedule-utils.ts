@@ -1,15 +1,13 @@
-import { ScheduleItem } from '@/app/types/schedule';
+import { ScheduleItem, WeekDay } from '@/app/types/schedule';
 
-export const WEEK_DAYS = [
+export const WEEK_DAYS: WeekDay[] = [
   'monday',
   'tuesday',
   'wednesday',
   'thursday',
   'friday',
   'saturday',
-] as const;
-
-export type WeekDay = (typeof WEEK_DAYS)[number];
+];
 
 export const createEmptySchedule = (): Record<string, ScheduleItem[]> => ({
   monday: [],
@@ -27,7 +25,13 @@ export const toScheduleMap = (lessons: ScheduleItem[]) => {
     if (!schedule[lesson.day]) {
       schedule[lesson.day] = [];
     }
-    schedule[lesson.day].push(lesson);
+
+    const withTime = {
+      ...lesson,
+      time: `${lesson.startTime} - ${lesson.endTime}`,
+    };
+
+    schedule[lesson.day].push(withTime);
   });
 
   return schedule;

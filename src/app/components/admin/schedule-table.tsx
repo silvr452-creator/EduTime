@@ -20,15 +20,20 @@ import {
   AlertDialogTitle,
 } from '@/app/components/ui/alert-dialog';
 import { Badge } from '@/app/components/ui/badge';
-import { ScheduleItem } from '@/app/types/schedule';
+import {
+  LessonUpsertPayload,
+  ScheduleItem,
+  ScheduleReferenceData,
+} from '@/app/types/schedule';
 import { AddEditLessonDialog } from '@/app/components/admin/add-edit-lesson-dialog';
 
 interface ScheduleTableProps {
   scheduleData: Record<string, ScheduleItem[]>;
   searchQuery: string;
   filterType: 'group' | 'teacher';
-  onEdit: (lesson: ScheduleItem) => Promise<void>;
+  onEdit: (lessonId: string, lesson: LessonUpsertPayload) => Promise<void>;
   onDelete: (lessonId: string) => Promise<void>;
+  referenceData: ScheduleReferenceData;
 }
 
 const DAY_NAMES: Record<string, string> = {
@@ -47,37 +52,36 @@ export function ScheduleTable({
   filterType,
   onEdit,
   onDelete,
+  referenceData,
 }: ScheduleTableProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [lessonToDelete, setLessonToDelete] = useState<string | null>(null);
   const [editingLesson, setEditingLesson] = useState<ScheduleItem | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  // Объединяем все занятия из всех дней
   const allLessons = useMemo(() => {
-    const lessons: Array<ScheduleItem & { day: string }> = [];
-    
-    Object.entries(scheduleData).forEach(([day, dayLessons]) => {
+    const lessons: ScheduleItem[] = [];
+
+    Object.values(scheduleData).forEach((dayLessons) => {
       dayLessons.forEach((lesson) => {
-        lessons.push({ ...lesson, day });
+        lessons.push(lesson);
       });
     });
-    
+
     return lessons;
   }, [scheduleData]);
 
-  // Фильтрация
   const filteredLessons = useMemo(() => {
     if (!searchQuery) return allLessons;
 
     const query = searchQuery.toLowerCase();
-    
+
     return allLessons.filter((lesson) => {
       if (filterType === 'group') {
         return lesson.group.toLowerCase().includes(query);
-      } else {
-        return lesson.teacher.toLowerCase().includes(query);
       }
+
+      return lesson.teacher.toLowerCase().includes(query);
     });
   }, [allLessons, searchQuery, filterType]);
 
@@ -91,16 +95,17 @@ export function ScheduleTable({
       await onDelete(lessonToDelete);
       setLessonToDelete(null);
     }
+
     setDeleteConfirmOpen(false);
   };
 
-  const handleEditClick = (lesson: ScheduleItem & { day: string }) => {
-    setEditingLesson({ ...lesson, day: lesson.day });
+  const handleEditClick = (lesson: ScheduleItem) => {
+    setEditingLesson(lesson);
     setIsEditDialogOpen(true);
   };
 
-  const handleEditSave = async (lesson: ScheduleItem) => {
-    await onEdit(lesson);
+  const handleEditSave = async (lessonId: string, lesson: LessonUpsertPayload) => {
+    await onEdit(lessonId, lesson);
     setIsEditDialogOpen(false);
     setEditingLesson(null);
   };
@@ -123,9 +128,7 @@ export function ScheduleTable({
         <div className="p-4 md:p-6 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-gray-400" />
-            <h2 className="font-semibold text-gray-900">
-              Расписание занятий
-            </h2>
+            <h2 className="font-semibold text-gray-900">Расписание занятий</h2>
             <Badge variant="secondary" className="ml-2">
               {filteredLessons.length} {filteredLessons.length === 1 ? 'занятие' : 'занятий'}
             </Badge>
@@ -158,16 +161,11 @@ export function ScheduleTable({
               ) : (
                 filteredLessons.map((lesson) => (
                   <TableRow key={lesson.id}>
-                    <TableCell className="font-medium">
-                      {DAY_NAMES[lesson.day]}
-                    </TableCell>
+                    <TableCell className="font-medium">{DAY_NAMES[lesson.day]}</TableCell>
                     <TableCell>{lesson.time}</TableCell>
                     <TableCell className="font-medium">{lesson.subject}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={typeColors[lesson.type]}
-                      >
+                      <Badge variant="outline" className={typeColors[lesson.type]}>
                         {typeLabels[lesson.type]}
                       </Badge>
                     </TableCell>
@@ -176,11 +174,7 @@ export function ScheduleTable({
                     <TableCell>{lesson.room}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditClick(lesson)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => handleEditClick(lesson)}>
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button
@@ -201,14 +195,12 @@ export function ScheduleTable({
         </div>
       </div>
 
-      {/* Диалог подтверждения удаления */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Подтвердите удаление</AlertDialogTitle>
             <AlertDialogDescription>
-              Вы уверены, что хотите удалить это занятие? Это действие нельзя
-              отменить.
+              Вы уверены, что хотите удалить это занятие? Это действие нельзя отменить.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -223,13 +215,13 @@ export function ScheduleTable({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Диалог редактирования */}
       {editingLesson && (
         <AddEditLessonDialog
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           onSave={handleEditSave}
           initialData={editingLesson}
+          referenceData={referenceData}
         />
       )}
     </>

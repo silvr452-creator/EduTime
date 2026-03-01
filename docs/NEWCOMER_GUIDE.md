@@ -9,7 +9,7 @@
 
 ## 2) Как устроено приложение
 
-### Маршрутизация (по сути state-based)
+### Маршрутизация (state-based)
 В проекте нет `react-router`: экран переключается вручную через `currentScreen` в `App.tsx`.
 
 - `login` → экран входа
@@ -21,57 +21,54 @@
 - **Преподаватель**: `TeacherDashboard`
 - **Админ**: `AdminDashboard`
 
-Роль пока вычисляется мок-логикой (по email) в `handleLogin`.
+Роль авторизации пока моковая (по email), но данные расписания уже приходят из API.
 
 ## 3) Данные и состояние
 
-### Текущее состояние
-Главные данные расписания живут в состоянии `scheduleData` в `App.tsx`.
+### Единый источник данных
+Расписание (`scheduleData`) и справочники (`referenceData`) загружаются в `App.tsx` из backend API и передаются во все экраны через props.
 
-Важно: в студентском экране (`DashboardScreen`) используется локальный `mockSchedule`, а не `scheduleData` из `App.tsx`. То есть изменения админа не попадут в студентский дашборд автоматически.
+### API-слой
+В `src/app/services/schedule-service.ts` сосредоточены:
+- загрузка уроков `GET /schedule/lessons`
+- загрузка справочников `GET /schedule/reference-data`
+- CRUD уроков `POST/PUT/DELETE /schedule/lessons`
 
 ### Формат занятия
-Единый тип `ScheduleItem` определён в `src/app/components/schedule-card.tsx`:
-- `id`, `subject`, `time`, `room`, `teacher`, `group`, `type`
+Единый тип `ScheduleItem` в `src/app/types/schedule.ts`.
+Тип хранит как отображаемые поля (`subject`, `teacher`, `group`, `room`, `time`), так и FK-идентификаторы (`subjectId`, `teacherId`, `groupId`, `classroomId`) для работы с MySQL-схемой.
 
 ## 4) Ключевые папки
 
 ```text
 src/
   app/
-    App.tsx                    # экранная «роутинг»-логика и общий state
+    App.tsx                    # экранная логика + загрузка API данных
+    services/
+      schedule-service.ts      # HTTP-клиент расписания и справочников
+    types/
+      schedule.ts              # типы расписания и payload
+    lib/
+      schedule-utils.ts        # преобразование массива уроков в map по дням
     components/
       auth/                    # login/register
       dashboard/               # студент
       teacher/                 # преподаватель
-      admin/                   # админ
+      admin/                   # админ + CRUD
       ui/                      # переиспользуемые UI-компоненты
-      schedule-card.tsx        # карточка и тип ScheduleItem
-      schedule-filters.tsx     # фильтры
-      week-navigation.tsx      # выбор дня недели
-  styles/
-    index.css                  # подключение общих стилей
-    theme.css                  # css-переменные и базовые токены темы
 ```
 
 ## 5) Что важно знать перед изменениями
 
-1. **Есть дублирование мок-данных** между `App.tsx` и `DashboardScreen`.
-2. **День занятия в админ-форме пока не используется полноценно**: поле `day` есть, но при сохранении в `ScheduleItem` не попадает.
-3. **Нет API-слоя**: всё на клиентском состоянии.
-4. **Нет глобального router/state manager**: навигация и состояние локальные.
+1. Админская форма создания/редактирования использует **справочники БД** (предметы, группы, преподаватели, аудитории).
+2. В запросы `POST/PUT` отправляются FK id, а в UI отображаются человекочитаемые имена из JOIN-ответов.
+3. Для корректной работы нужен `VITE_API_BASE_URL`.
+4. Контракт API и MySQL DDL описаны в `docs/DB_SETUP.md`.
 
 ## 6) С чего изучать дальше (порядок)
 
-1. `src/app/App.tsx` — понять поток экранов и ролей.
-2. `src/app/components/auth/*` — как устроены формы и валидация.
-3. `src/app/components/dashboard/*`, `teacher/*`, `admin/*` — поведение по ролям.
-4. `src/app/components/admin/schedule-table.tsx` и `add-edit-lesson-dialog.tsx` — CRUD-операции расписания.
-5. `src/app/components/ui/*` — библиотека компонентов.
-6. `vite.config.ts` и `src/styles/theme.css` — alias, тема, базовые стили.
-
-## 7) Практичный next step (для развития проекта)
-
-- Вынести расписание в единый источник (например, контекст или store), чтобы все роли видели одинаковые данные.
-- Добавить нормальный `day` в модель записи и учитывать его при создании/редактировании.
-- После этого подключить backend API и заменить мок-логику входа/данных.
+1. `src/app/App.tsx` — загрузка данных и распределение по экранам.
+2. `src/app/services/schedule-service.ts` — контракт API и маппинг DTO.
+3. `src/app/components/admin/*` — CRUD и интеграция справочников.
+4. `src/app/components/dashboard/*` и `teacher/*` — фильтрация и отображение.
+5. `docs/DB_SETUP.md` — привязка к MySQL по ER-модели.

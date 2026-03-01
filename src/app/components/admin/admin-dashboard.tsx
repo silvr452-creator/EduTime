@@ -13,15 +13,21 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import { ScheduleTable } from '@/app/components/admin/schedule-table';
 import { AddEditLessonDialog } from '@/app/components/admin/add-edit-lesson-dialog';
-import { ScheduleItem } from '@/app/types/schedule';
+import {
+  LessonUpsertPayload,
+  ScheduleItem,
+  ScheduleReferenceData,
+} from '@/app/types/schedule';
 import { toast } from 'sonner';
 
 interface AdminDashboardProps {
   userName: string;
   onLogout: () => void;
   scheduleData: Record<string, ScheduleItem[]>;
-  onAddLesson: (lesson: Omit<ScheduleItem, 'id'>) => Promise<void>;
-  onEditLesson: (lesson: ScheduleItem) => Promise<void>;
+  referenceData: ScheduleReferenceData;
+  isLoading?: boolean;
+  onAddLesson: (lesson: LessonUpsertPayload) => Promise<void>;
+  onEditLesson: (lessonId: string, lesson: LessonUpsertPayload) => Promise<void>;
   onDeleteLesson: (lessonId: string) => Promise<void>;
 }
 
@@ -29,6 +35,8 @@ export function AdminDashboard({
   userName,
   onLogout,
   scheduleData,
+  referenceData,
+  isLoading = false,
   onAddLesson,
   onEditLesson,
   onDeleteLesson,
@@ -37,7 +45,7 @@ export function AdminDashboard({
   const [selectedFilter, setSelectedFilter] = useState<'group' | 'teacher'>('group');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
-  const handleAddLesson = async (lesson: Omit<ScheduleItem, 'id'>) => {
+  const handleAddLesson = async (lesson: LessonUpsertPayload) => {
     try {
       await onAddLesson(lesson);
       setIsAddDialogOpen(false);
@@ -47,9 +55,9 @@ export function AdminDashboard({
     }
   };
 
-  const handleEditLesson = async (lesson: ScheduleItem) => {
+  const handleEditLesson = async (lessonId: string, lesson: LessonUpsertPayload) => {
     try {
-      await onEditLesson(lesson);
+      await onEditLesson(lessonId, lesson);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось обновить занятие';
       toast.error(message);
@@ -138,6 +146,7 @@ export function AdminDashboard({
               <Button
                 onClick={() => setIsAddDialogOpen(true)}
                 className="bg-purple-600 hover:bg-purple-700 gap-2"
+                disabled={isLoading || referenceData.groups.length === 0}
               >
                 <Plus className="w-4 h-4" />
                 Добавить занятие
@@ -151,6 +160,7 @@ export function AdminDashboard({
             filterType={selectedFilter}
             onEdit={handleEditLesson}
             onDelete={handleDeleteLesson}
+            referenceData={referenceData}
           />
         </div>
       </main>
@@ -159,6 +169,7 @@ export function AdminDashboard({
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onSave={handleAddLesson}
+        referenceData={referenceData}
       />
     </div>
   );
