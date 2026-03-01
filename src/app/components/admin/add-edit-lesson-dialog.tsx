@@ -145,6 +145,8 @@ export function AddEditLessonDialog({
     if (errors.startTime || errors.endTime) {
       setErrors((prev) => ({ ...prev, startTime: '', endTime: '' }));
     }
+
+    onOpenChange(false);
   };
 
   const handleSelectNumber = (field: keyof LessonUpsertPayload, value: string) => {
