@@ -117,10 +117,24 @@
 
 ## 🗄️ Данные из реальной БД
 
-Приложение использует backend API для чтения/изменения расписания. Контракт подготовлен под MySQL и ER-диаграмму (таблицы role/user/student/teacher/groups/subject/classroom/lesson).
+Приложение использует backend API для чтения/изменения расписания. Контракт подготовлен под PostgreSQL и ER-диаграмму (таблицы role/app_user/student/teacher/groups/subject/classroom/lesson).
 
 - Настройка и контракт API: [`docs/DB_SETUP.md`](docs/DB_SETUP.md)
 - Обязательная переменная окружения: `VITE_API_BASE_URL`
+
+
+## 🖥️ Backend API (PostgreSQL)
+
+В репозитории добавлен backend: `backend/` (Node.js + Express + pg).
+
+Быстрый запуск backend:
+1. `cd backend`
+2. `npm install`
+3. `cp .env.example .env`
+4. Создать БД и применить схему: `psql -U postgres -d edutime -f sql/init.sql`
+5. `npm run dev`
+
+API будет доступен на `http://localhost:3000/api`, фронтенд использует `VITE_API_BASE_URL=http://localhost:3000/api`.
 
 ## ⚡ Технологии
 
