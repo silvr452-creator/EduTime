@@ -36,7 +36,7 @@
 
 ### Формат занятия
 Единый тип `ScheduleItem` в `src/app/types/schedule.ts`.
-Тип хранит как отображаемые поля (`subject`, `teacher`, `group`, `room`, `time`), так и FK-идентификаторы (`subjectId`, `teacherId`, `groupId`, `classroomId`) для работы с MySQL-схемой.
+Тип хранит как отображаемые поля (`subject`, `teacher`, `group`, `room`, `time`), так и FK-идентификаторы (`subjectId`, `teacherId`, `groupId`, `classroomId`) для работы с PostgreSQL-схемой.
 
 ## 4) Ключевые папки
 
@@ -63,7 +63,7 @@ src/
 1. Админская форма создания/редактирования использует **справочники БД** (предметы, группы, преподаватели, аудитории).
 2. В запросы `POST/PUT` отправляются FK id, а в UI отображаются человекочитаемые имена из JOIN-ответов.
 3. Для корректной работы нужен `VITE_API_BASE_URL`.
-4. Контракт API и MySQL DDL описаны в `docs/DB_SETUP.md`.
+4. Контракт API и PostgreSQL DDL описаны в `docs/DB_SETUP.md`.
 
 ## 6) С чего изучать дальше (порядок)
 
@@ -71,4 +71,4 @@ src/
 2. `src/app/services/schedule-service.ts` — контракт API и маппинг DTO.
 3. `src/app/components/admin/*` — CRUD и интеграция справочников.
 4. `src/app/components/dashboard/*` и `teacher/*` — фильтрация и отображение.
-5. `docs/DB_SETUP.md` — привязка к MySQL по ER-модели.
+5. `docs/DB_SETUP.md` — привязка к PostgreSQL по ER-модели.

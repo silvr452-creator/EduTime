@@ -117,7 +117,7 @@
 
 ## 🗄️ Данные из реальной БД
 
-Приложение использует backend API для чтения/изменения расписания. Контракт подготовлен под MySQL и ER-диаграмму (таблицы role/user/student/teacher/groups/subject/classroom/lesson).
+Приложение использует backend API для чтения/изменения расписания. Контракт подготовлен под PostgreSQL и ER-диаграмму (таблицы role/app_user/student/teacher/groups/subject/classroom/lesson).
 
 - Настройка и контракт API: [`docs/DB_SETUP.md`](docs/DB_SETUP.md)
 - Обязательная переменная окружения: `VITE_API_BASE_URL`

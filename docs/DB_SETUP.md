@@ -1,4 +1,4 @@
-# Подключение к MySQL (по вашей ER-диаграмме)
+# Подключение к PostgreSQL (по вашей ER-диаграмме)
 
 Ниже контракт, к которому уже подготовлен фронтенд.
 
@@ -9,7 +9,7 @@
 VITE_API_BASE_URL=http://localhost:3000/api
 ```
 
-`VITE_API_BASE_URL` — адрес backend API, который работает с MySQL.
+`VITE_API_BASE_URL` — адрес backend API, который работает с PostgreSQL.
 
 ## 2) Что фронтенд ожидает от API
 
@@ -68,68 +68,71 @@ VITE_API_BASE_URL=http://localhost:3000/api
 }
 ```
 
-## 3) MySQL DDL по ER-диаграмме
+## 3) PostgreSQL DDL по ER-диаграмме
 
 ```sql
+CREATE TYPE lesson_day AS ENUM ('monday','tuesday','wednesday','thursday','friday','saturday');
+CREATE TYPE lesson_type AS ENUM ('lecture','practice','lab');
+
 CREATE TABLE role (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   roleName VARCHAR(64) NOT NULL UNIQUE
 );
 
-CREATE TABLE user (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+CREATE TABLE app_user (
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   roleId INT NOT NULL,
   username VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_user_role FOREIGN KEY (roleId) REFERENCES role(id)
+  createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_app_user_role FOREIGN KEY (roleId) REFERENCES role(id)
 );
 
-CREATE TABLE `groups` (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+CREATE TABLE groups (
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   groupName VARCHAR(50) NOT NULL UNIQUE
 );
 
 CREATE TABLE teacher (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   userId INT NOT NULL UNIQUE,
   fullName VARCHAR(255) NOT NULL,
-  CONSTRAINT fk_teacher_user FOREIGN KEY (userId) REFERENCES user(id)
+  CONSTRAINT fk_teacher_user FOREIGN KEY (userId) REFERENCES app_user(id)
 );
 
 CREATE TABLE student (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   groupId INT NOT NULL,
   userId INT NOT NULL UNIQUE,
   fullName VARCHAR(255) NOT NULL,
-  CONSTRAINT fk_student_group FOREIGN KEY (groupId) REFERENCES `groups`(id),
-  CONSTRAINT fk_student_user FOREIGN KEY (userId) REFERENCES user(id)
+  CONSTRAINT fk_student_group FOREIGN KEY (groupId) REFERENCES groups(id),
+  CONSTRAINT fk_student_user FOREIGN KEY (userId) REFERENCES app_user(id)
 );
 
 CREATE TABLE subject (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   subjectName VARCHAR(255) NOT NULL UNIQUE
 );
 
 CREATE TABLE classroom (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   roomNumber VARCHAR(50) NOT NULL UNIQUE
 );
 
 CREATE TABLE lesson (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   subjectId INT NOT NULL,
   teacherId INT NOT NULL,
   groupId INT NOT NULL,
   classroomId INT NOT NULL,
-  day ENUM('monday','tuesday','wednesday','thursday','friday','saturday') NOT NULL,
-  lessonType ENUM('lecture','practice','lab') NOT NULL,
+  day lesson_day NOT NULL,
+  lessonType lesson_type NOT NULL,
   startTime TIME NOT NULL,
   endTime TIME NOT NULL,
   CONSTRAINT fk_lesson_subject FOREIGN KEY (subjectId) REFERENCES subject(id),
   CONSTRAINT fk_lesson_teacher FOREIGN KEY (teacherId) REFERENCES teacher(id),
-  CONSTRAINT fk_lesson_group FOREIGN KEY (groupId) REFERENCES `groups`(id),
+  CONSTRAINT fk_lesson_group FOREIGN KEY (groupId) REFERENCES groups(id),
   CONSTRAINT fk_lesson_classroom FOREIGN KEY (classroomId) REFERENCES classroom(id),
   CONSTRAINT chk_lesson_time CHECK (startTime < endTime)
 );
