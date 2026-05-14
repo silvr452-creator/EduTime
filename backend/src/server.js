@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { query } from './db.js';
+import { createHash, randomBytes } from 'node:crypto';
+import { promises as dns } from 'node:dns';
+import { pool, query } from './db.js';
 
 dotenv.config({ path: '.env' });
 dotenv.config({ path: 'backend/.env' });
@@ -12,9 +14,182 @@ const port = Number(process.env.PORT ?? 3000);
 app.use(cors());
 app.use(express.json());
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function hashPassword(password, salt = randomBytes(16).toString('hex')) {
+  const hash = createHash('sha256').update(`${salt}:${password}`).digest('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, savedHash) {
+  const [salt] = savedHash.split(':');
+  if (!salt) return false;
+  return hashPassword(password, salt) === savedHash;
+}
+
+async function hasMxRecord(email) {
+  const domain = email.split('@')[1];
+  if (!domain) return false;
+
+  try {
+    const records = await dns.resolveMx(domain);
+    return records.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 app.get('/api/health', async (_req, res) => {
   await query('SELECT 1');
   res.json({ ok: true });
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  const { name, email, password, role, group } = req.body;
+
+  if (!name || name.trim().length < 3) {
+    return res.status(400).json({ message: 'ФИО должно содержать минимум 3 символа' });
+  }
+
+  if (!email || !EMAIL_REGEX.test(email)) {
+    return res.status(400).json({ message: 'Некорректный формат email' });
+  }
+
+  if (!(await hasMxRecord(email))) {
+    return res.status(400).json({ message: 'У email домена отсутствует почтовый сервер (MX)' });
+  }
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({ message: 'Пароль должен содержать минимум 6 символов' });
+  }
+
+  if (!['student', 'teacher', 'admin'].includes(role)) {
+    return res.status(400).json({ message: 'Некорректная роль' });
+  }
+
+  if (role === 'student' && !group) {
+    return res.status(400).json({ message: 'Для студента необходимо выбрать группу' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const userExists = await client.query('SELECT id FROM app_user WHERE email = $1', [email.toLowerCase()]);
+    if (userExists.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: 'Пользователь с таким email уже существует' });
+    }
+
+    const roleRow = await client.query('SELECT id FROM role WHERE role_name = $1', [role]);
+    if (!roleRow.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({ message: 'Роль не найдена в БД' });
+    }
+
+    const username = email.toLowerCase();
+    const passwordHash = hashPassword(password);
+    const createdUser = await client.query(
+      `INSERT INTO app_user (role_id, username, password_hash, email)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [roleRow.rows[0].id, username, passwordHash, email.toLowerCase()],
+    );
+
+    const userId = createdUser.rows[0].id;
+    let userGroup = null;
+
+    if (role === 'student') {
+      const groupRow = await client.query(
+        'INSERT INTO groups (group_name) VALUES ($1) ON CONFLICT (group_name) DO UPDATE SET group_name = EXCLUDED.group_name RETURNING id, group_name',
+        [group],
+      );
+
+      userGroup = groupRow.rows[0].group_name;
+
+      await client.query(
+        'INSERT INTO student (group_id, user_id, full_name) VALUES ($1, $2, $3)',
+        [groupRow.rows[0].id, userId, name.trim()],
+      );
+    }
+
+    if (role === 'teacher') {
+      await client.query(
+        'INSERT INTO teacher (user_id, full_name) VALUES ($1, $2)',
+        [userId, name.trim()],
+      );
+    }
+
+    await client.query('COMMIT');
+
+    console.log(`[Pseudo email] Отправлено письмо подтверждения на ${email.toLowerCase()}`);
+
+    return res.status(201).json({
+      message: 'Регистрация успешна. Письмо отправлено (псевдо).',
+      user: {
+        name: name.trim(),
+        email: email.toLowerCase(),
+        role,
+        group: userGroup,
+      },
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !EMAIL_REGEX.test(email)) {
+    return res.status(400).json({ message: 'Некорректный email' });
+  }
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({ message: 'Некорректный пароль' });
+  }
+
+  const result = await query(
+    `SELECT
+      u.id,
+      u.email,
+      u.password_hash AS "passwordHash",
+      r.role_name AS role,
+      t.full_name AS "teacherName",
+      s.full_name AS "studentName",
+      g.group_name AS "groupName"
+    FROM app_user u
+    JOIN role r ON r.id = u.role_id
+    LEFT JOIN teacher t ON t.user_id = u.id
+    LEFT JOIN student s ON s.user_id = u.id
+    LEFT JOIN groups g ON g.id = s.group_id
+    WHERE u.email = $1`,
+    [email.toLowerCase()],
+  );
+
+  if (!result.rowCount) {
+    return res.status(401).json({ message: 'Неверный email или пароль' });
+  }
+
+  const user = result.rows[0];
+
+  if (!verifyPassword(password, user.passwordHash)) {
+    return res.status(401).json({ message: 'Неверный email или пароль' });
+  }
+
+  const displayName = user.teacherName ?? user.studentName ?? 'Администратор';
+
+  res.json({
+    user: {
+      name: displayName,
+      email: user.email,
+      role: user.role,
+      group: user.groupName,
+    },
+  });
 });
 
 app.get('/api/schedule/reference-data', async (_req, res) => {

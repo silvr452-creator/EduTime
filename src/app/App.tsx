@@ -18,6 +18,7 @@ import {
   removeLesson,
   updateLesson,
 } from '@/app/services/schedule-service';
+import { loginUser, registerUser } from '@/app/services/auth-service';
 
 type Screen = 'login' | 'register' | 'dashboard';
 
@@ -68,50 +69,34 @@ export default function App() {
     load();
   }, []);
 
-  const handleLogin = (email: string, password: string) => {
-    let role: UserRole = 'student';
-    let name = 'Иванов Иван Иванович';
-    let group = 'ИС-21';
-
-    if (email.includes('admin')) {
-      role = 'admin';
-      name = 'Администратор';
-      group = undefined;
-    } else if (email.includes('teacher') || email.includes('petrov')) {
-      role = 'teacher';
-      name = 'Петров В.С.';
-      group = undefined;
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      const loggedInUser = await loginUser(email, password);
+      setUser(loggedInUser);
+      setCurrentScreen('dashboard');
+      toast.success(`Добро пожаловать, ${loggedInUser.name}!`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Ошибка авторизации';
+      toast.error(message);
     }
-
-    const mockUser: User = {
-      name,
-      email,
-      group,
-      role,
-    };
-
-    setUser(mockUser);
-    setCurrentScreen('dashboard');
-    toast.success(`Добро пожаловать, ${mockUser.name}!`);
   };
 
-  const handleRegister = (userData: {
+  const handleRegister = async (userData: {
     name: string;
     email: string;
     password: string;
     group?: string;
     role: UserRole;
   }) => {
-    const newUser: User = {
-      name: userData.name,
-      email: userData.email,
-      group: userData.group,
-      role: userData.role,
-    };
-
-    setUser(newUser);
-    setCurrentScreen('dashboard');
-    toast.success(`Аккаунт успешно создан! Добро пожаловать, ${newUser.name}!`);
+    try {
+      const newUser = await registerUser(userData);
+      setUser(newUser);
+      setCurrentScreen('dashboard');
+      toast.success(`Аккаунт успешно создан! Добро пожаловать, ${newUser.name}!`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Ошибка регистрации';
+      toast.error(message);
+    }
   };
 
   const handleLogout = () => {
